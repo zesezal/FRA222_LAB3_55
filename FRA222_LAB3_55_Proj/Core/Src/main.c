@@ -53,7 +53,7 @@ UART_HandleTypeDef huart2;
 /* USER CODE BEGIN PV */
 uint32_t InputCaptureBuffer[IC_BUFFER_SIZE];
 float averageRisingedgePeriod;
-uint32_t MotorSetDuty = 500;
+uint32_t MotorSetDuty = 5;
 
 uint32_t QEIReadRaw;
 float encoderDegree;
@@ -146,7 +146,7 @@ int main(void)
 	  		  averageRisingedgePeriod = IC_Calc_Period();
 	  		  QEIEncoderPositionVelocity_Update();
 
-	  		  __HAL_TIM_SET_COMPARE(&htim1,TIM_CHANNEL_1,MotorSetDuty);
+	  		  __HAL_TIM_SET_COMPARE(&htim1,TIM_CHANNEL_1,MotorSetDuty * 100);
 	  	  }
 	  	encoderDegree = (float) QEIReadRaw*(360.0/3072.0);
   }
@@ -222,7 +222,7 @@ static void MX_TIM1_Init(void)
   htim1.Instance = TIM1;
   htim1.Init.Prescaler = 83;
   htim1.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim1.Init.Period = 1000;
+  htim1.Init.Period = 10000;
   htim1.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim1.Init.RepetitionCounter = 0;
   htim1.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
