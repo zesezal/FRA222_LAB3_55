@@ -45,6 +45,7 @@
 TIM_HandleTypeDef htim1;
 TIM_HandleTypeDef htim2;
 TIM_HandleTypeDef htim3;
+TIM_HandleTypeDef htim5;
 DMA_HandleTypeDef hdma_tim2_ch1;
 
 UART_HandleTypeDef huart2;
@@ -52,7 +53,7 @@ UART_HandleTypeDef huart2;
 /* USER CODE BEGIN PV */
 uint32_t InputCaptureBuffer[IC_BUFFER_SIZE];
 float averageRisingedgePeriod;
-uint32_t duty = 500;
+uint32_t MotorSetDuty = 500;
 
 uint32_t QEIReadRaw;
 float encoderDegree;
@@ -65,6 +66,7 @@ typedef struct _QEIStructure
 	float QEIVelocity; // step/sec
 }QEIStructureTypedef;
 QEIStructureTypedef QEIData = {0};
+uint64_t _micros = 0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -75,8 +77,10 @@ static void MX_USART2_UART_Init(void);
 static void MX_TIM2_Init(void);
 static void MX_TIM1_Init(void);
 static void MX_TIM3_Init(void);
+static void MX_TIM5_Init(void);
 /* USER CODE BEGIN PFP */
-
+inline uint64_t micros();
+float IC_Calc_Period();
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -117,12 +121,14 @@ int main(void)
   MX_TIM2_Init();
   MX_TIM1_Init();
   MX_TIM3_Init();
+  MX_TIM5_Init();
   /* USER CODE BEGIN 2 */
-	HAL_TIM_Base_Start(&htim2);
-	HAL_TIM_IC_Start_DMA(&htim2, TIM_CHANNEL_1, InputCaptureBuffer, IC_BUFFER_SIZE);
 	HAL_TIM_Base_Start(&htim1);
 	HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
+	HAL_TIM_Base_Start(&htim2);
+	HAL_TIM_IC_Start_DMA(&htim2, TIM_CHANNEL_1, InputCaptureBuffer, IC_BUFFER_SIZE);
 	HAL_TIM_Encoder_Start(&htim3, TIM_CHANNEL_1|TIM_CHANNEL_2);
+	HAL_TIM_Base_Start(&htim5);
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -133,13 +139,14 @@ int main(void)
 
     /* USER CODE BEGIN 3 */
 	  static uint32_t timestamp = 0;
-	  	  if (HAL_GetTick()>= timestamp)
+	  int currentTime = micros();
+	  	  if (currentTime >= timestamp)
 	  	  {
 	  		  timestamp = HAL_GetTick() + 500;
 	  		  averageRisingedgePeriod = IC_Calc_Period();
 	  		  QEIEncoderPositionVelocity_Update();
 
-	  		  __HAL_TIM_SET_COMPARE(&htim1,TIM_CHANNEL_1,duty);
+	  		  __HAL_TIM_SET_COMPARE(&htim1,TIM_CHANNEL_1,MotorSetDuty);
 	  	  }
 	  	encoderDegree = (float) QEIReadRaw*(360.0/3072.0);
   }
@@ -375,6 +382,51 @@ static void MX_TIM3_Init(void)
 }
 
 /**
+  * @brief TIM5 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM5_Init(void)
+{
+
+  /* USER CODE BEGIN TIM5_Init 0 */
+
+  /* USER CODE END TIM5_Init 0 */
+
+  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+
+  /* USER CODE BEGIN TIM5_Init 1 */
+
+  /* USER CODE END TIM5_Init 1 */
+  htim5.Instance = TIM5;
+  htim5.Init.Prescaler = 0;
+  htim5.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim5.Init.Period = QEI_PERIOD -1;
+  htim5.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim5.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim5) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim5, &sClockSourceConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim5, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM5_Init 2 */
+
+  /* USER CODE END TIM5_Init 2 */
+
+}
+
+/**
   * @brief USART2 Initialization Function
   * @param None
   * @retval None
@@ -477,7 +529,18 @@ float IC_Calc_Period()
 	}
 	return sumdiff / 5.0;
 }
-
+//microsec timer implement
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
+{
+	if(htim == &htim5)
+	{
+		_micros += UINT32_MAX;
+	}
+}
+uint64_t micros()
+{
+	return __HAL_TIM_GET_COUNTER(&htim5)+_micros;
+}
 void QEIEncoderPositionVelocity_Update()
 {
 	//collect data
@@ -492,8 +555,7 @@ void QEIEncoderPositionVelocity_Update()
 	float difftime = (QEIData.timestamp[0] - QEIData.timestamp[1]);
 
 	//handle wrap-around
-	//this is how to divide 2 with fast : shift bits (can work with multiply 2 too)
-	// if the different is greater than half it mean warping occured;
+
 	if(diffPosition > QEI_PERIOD >> 1) diffPosition -= QEI_PERIOD;
 	if(diffPosition < -(QEI_PERIOD >> 1)) diffPosition += QEI_PERIOD;
 
