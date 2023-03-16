@@ -15,6 +15,7 @@
   *
   ******************************************************************************
   */
+#include "stdio.h"
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
@@ -49,7 +50,21 @@ DMA_HandleTypeDef hdma_tim2_ch1;
 UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
+uint32_t InputCaptureBuffer[IC_BUFFER_SIZE];
+float averageRisingedgePeriod;
+uint32_t duty = 500;
 
+uint32_t QEIReadRaw;
+float encoderDegree;
+typedef struct _QEIStructure
+{
+	uint32_t data[2]; //position data counter
+	uint64_t timestamp[2];
+
+	float QEIPosition; // step
+	float QEIVelocity; // step/sec
+}QEIStructureTypedef;
+QEIStructureTypedef QEIData = {0};
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -103,7 +118,11 @@ int main(void)
   MX_TIM1_Init();
   MX_TIM3_Init();
   /* USER CODE BEGIN 2 */
-
+	HAL_TIM_Base_Start(&htim2);
+	HAL_TIM_IC_Start_DMA(&htim2, TIM_CHANNEL_1, InputCaptureBuffer, IC_BUFFER_SIZE);
+	HAL_TIM_Base_Start(&htim1);
+	HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
+	HAL_TIM_Encoder_Start(&htim3, TIM_CHANNEL_1|TIM_CHANNEL_2);
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -113,6 +132,16 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+	  static uint32_t timestamp = 0;
+	  	  if (HAL_GetTick()>= timestamp)
+	  	  {
+	  		  timestamp = HAL_GetTick() + 500;
+	  		  averageRisingedgePeriod = IC_Calc_Period();
+	  		  QEIEncoderPositionVelocity_Update();
+
+	  		  __HAL_TIM_SET_COMPARE(&htim1,TIM_CHANNEL_1,duty);
+	  	  }
+	  	encoderDegree = (float) QEIReadRaw*(360.0/3072.0);
   }
   /* USER CODE END 3 */
 }
@@ -432,7 +461,48 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
+float IC_Calc_Period()
+{
+	uint32_t currentDMAPointer = IC_BUFFER_SIZE - __HAL_DMA_GET_COUNTER((htim2.hdma[1]));
+	uint32_t lastValidDMAPointer = (currentDMAPointer-1+IC_BUFFER_SIZE) % IC_BUFFER_SIZE;
+	uint32_t i = (lastValidDMAPointer + IC_BUFFER_SIZE - 5) % IC_BUFFER_SIZE;
+	int32_t sumdiff =0;
 
+	while (i != lastValidDMAPointer)
+	{
+		uint32_t firstCapture = InputCaptureBuffer[i];
+		uint32_t NextCapture = InputCaptureBuffer[(i+1)%IC_BUFFER_SIZE];
+		sumdiff += NextCapture - firstCapture;
+		i = (i+1)%IC_BUFFER_SIZE;
+	}
+	return sumdiff / 5.0;
+}
+
+void QEIEncoderPositionVelocity_Update()
+{
+	//collect data
+	QEIData.timestamp[0] = micros();
+	uint32_t counterPosition = __HAL_TIM_GET_COUNTER(&htim3);
+	QEIData.data[0] = counterPosition;
+
+	//calculation
+	QEIData.QEIPosition = counterPosition % 3072;
+
+	int32_t diffPosition = QEIData.data[0] - QEIData.data[1];
+	float difftime = (QEIData.timestamp[0] - QEIData.timestamp[1]);
+
+	//handle wrap-around
+	//this is how to divide 2 with fast : shift bits (can work with multiply 2 too)
+	// if the different is greater than half it mean warping occured;
+	if(diffPosition > QEI_PERIOD >> 1) diffPosition -= QEI_PERIOD;
+	if(diffPosition < -(QEI_PERIOD >> 1)) diffPosition += QEI_PERIOD;
+
+	//calculate angular velocity in pulse per sec
+	QEIData.QEIVelocity = ((float)diffPosition * 1000000.0)/difftime;
+
+	QEIData.data[1] = QEIData.data[0];
+	QEIData.timestamp[1] = QEIData.timestamp[0];
+}
 /* USER CODE END 4 */
 
 /**
