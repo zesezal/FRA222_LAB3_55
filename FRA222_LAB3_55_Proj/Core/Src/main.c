@@ -124,11 +124,7 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-	  if (PWMsetter == 0){
-		  MotorReadRPM = 0;
-		  averageRisingedgePeriod = 0 ;
 
-	  }
 	  static uint32_t timestamp = 0;
 	  	  if (HAL_GetTick()>= timestamp)
 	  	  {
@@ -149,11 +145,13 @@ int main(void)
 
 			  // RPM is lower than expect
 			  if(MotorSetRPM - MotorReadRPM >= 0.1){
-				  PWMsetter += 100;
+				  //PWMsetter += 100;
+
 			  }
 			  // RPM is higher than expect
 			  else if(MotorReadRPM - MotorSetRPM >= 0.1){
-				  PWMsetter -= 100;
+				  //PWMsetter -= 100;
+
 			  }
 			  __HAL_TIM_SET_COMPARE(&htim1,TIM_CHANNEL_1,PWMsetter);
 
