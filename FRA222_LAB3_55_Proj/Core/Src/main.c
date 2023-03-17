@@ -52,12 +52,12 @@ UART_HandleTypeDef huart2;
 
 uint32_t InputCaptureBuffer[IC_BUFFER_SIZE];
 float averageRisingedgePeriod;
-uint32_t MotorSetDuty = 5;
+uint32_t MotorSetDuty = 0;
 float ontime;
 float MotorReadRPM;
 float MotorSetRPM = 0;
 int MotorControlEnable = 0;
-float PWMsetter;
+float PWMsetter = 0;
 
 /* USER CODE END PV */
 
@@ -124,7 +124,16 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+	  if(MotorSetRPM == 0 && MotorControlEnable == 1){
+		  MotorReadRPM = 0;
+		  averageRisingedgePeriod = 0;
 
+	  }
+	  if(MotorSetDuty == 0 && MotorControlEnable == 0){
+		  MotorReadRPM = 0;
+		  averageRisingedgePeriod = 0;
+
+	  }
 	  static uint32_t timestamp = 0;
 	  	  if (HAL_GetTick()>= timestamp)
 	  	  {
@@ -140,18 +149,22 @@ int main(void)
 			  //the time of 1 fan arm move 30 degree
 			  MotorReadRPM = (60.0*30.0*1000000.0)/(360.0*averageRisingedgePeriod*64);
 
-			  //No more than 25 rpm
-			  PWMsetter = (MotorSetRPM/25.0)*10000;
 
 			  // RPM is lower than expect
-			  if(MotorSetRPM - MotorReadRPM >= 0.1){
-				  //PWMsetter += 100;
+			  if(MotorSetRPM - MotorReadRPM >= 5 && PWMsetter < 10000){
+				  PWMsetter += 500;
 
 			  }
+			  if(MotorSetRPM - MotorReadRPM >= 0.1 && MotorSetRPM - MotorReadRPM < 5 && PWMsetter < 10000){
+				  PWMsetter += 50;
+			  }
 			  // RPM is higher than expect
-			  else if(MotorReadRPM - MotorSetRPM >= 0.1){
-				  //PWMsetter -= 100;
+			  else if(MotorReadRPM - MotorSetRPM >= 5 && PWMsetter >= 0){
+				  PWMsetter -= 500;
 
+			  }
+			  else if(MotorReadRPM - MotorSetRPM >= 0.1 && MotorReadRPM - MotorSetRPM < 5 && PWMsetter >= 0){
+				  PWMsetter -= 50;
 			  }
 			  __HAL_TIM_SET_COMPARE(&htim1,TIM_CHANNEL_1,PWMsetter);
 
