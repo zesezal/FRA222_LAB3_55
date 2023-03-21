@@ -153,12 +153,7 @@ int main(void)
 
 	  		}
 	  		else if (MotorControlEnable == 1){
-	  			if(PWMsetter < 0){
-					PWMsetter = 0;
-				}
-	  			if(PWMsetter > 10000){
-					PWMsetter = 10000;
-				}
+
 
 			  //the time of 1 fan arm move 30 degree
 			  MotorReadRPM = (60.0*30.0*1000000.0)/(360.0*averageRisingedgePeriod*64);
@@ -169,21 +164,34 @@ int main(void)
 				  PWMsetter += 500;
 
 			  }
-			  if(MotorSetRPM - MotorReadRPM >= 0.1 && MotorSetRPM - MotorReadRPM < 5 && PWMsetter < 10000){
+			  else if(MotorSetRPM - MotorReadRPM >= 0.5 && MotorSetRPM - MotorReadRPM < 5 && PWMsetter < 10000){
 				  PWMsetter += 50;
+			  }
+			  else if(MotorSetRPM - MotorReadRPM >= 0.1 && MotorSetRPM - MotorReadRPM < 0.5 && PWMsetter < 10000){
+				  PWMsetter += 10;
 			  }
 			  // RPM is higher than expect
 			  else if(MotorReadRPM - MotorSetRPM >= 5 && PWMsetter >= 0){
 				  PWMsetter -= 500;
 
 			  }
-			  else if(MotorReadRPM - MotorSetRPM >= 0.1 && MotorReadRPM - MotorSetRPM < 5 && PWMsetter >= 0){
+			  else if(MotorReadRPM - MotorSetRPM >= 0.5 && MotorReadRPM - MotorSetRPM < 5 && PWMsetter >= 0){
 				  PWMsetter -= 50;
 			  }
+			  else if(MotorReadRPM - MotorSetRPM >= 0.1 && MotorReadRPM - MotorSetRPM < 0.5 && PWMsetter >= 0){
+				  PWMsetter -= 10;
+			  }
+			  if(PWMsetter < 0){
+				PWMsetter = 0;
+			  	  }
+			  if(PWMsetter > 10000){
+				PWMsetter = 10000;
+				}
 			  __HAL_TIM_SET_COMPARE(&htim1,TIM_CHANNEL_1,PWMsetter);
 
 
 			}
+
 	  	  }
 
 
