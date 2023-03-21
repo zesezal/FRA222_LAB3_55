@@ -140,12 +140,26 @@ int main(void)
 	  		timestamp = HAL_GetTick() + 100;
 	  		averageRisingedgePeriod = IC_Calc_Period();
 	  		if (MotorControlEnable == 0){
-
+	  			if(MotorSetDuty > 100){
+	  				MotorSetDuty = 100;
+	  			}
+	  			if(MotorSetDuty < 0){
+					MotorSetDuty = 0;
+				}
+	  			MotorSetRPM = 0;
 	  		  //the time of 1 fan arm move 30 degree
 	  		  MotorReadRPM = 60.0*30.0*1000000.0/(360.0*averageRisingedgePeriod*64);
 	  		  __HAL_TIM_SET_COMPARE(&htim1,TIM_CHANNEL_1,MotorSetDuty * 100);
+
 	  		}
 	  		else if (MotorControlEnable == 1){
+	  			if(PWMsetter < 0){
+					PWMsetter = 0;
+				}
+	  			if(PWMsetter > 10000){
+					PWMsetter = 10000;
+				}
+
 			  //the time of 1 fan arm move 30 degree
 			  MotorReadRPM = (60.0*30.0*1000000.0)/(360.0*averageRisingedgePeriod*64);
 
